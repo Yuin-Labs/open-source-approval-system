@@ -503,4 +503,581 @@ function sendApprovalEmail(row, level) {
 
   const targetLevelParam = (level === "L2_SPECIAL") ? "L2" : level;
   const rawApproveUrl = `${WEB_APP_URL_RAW}?row=${row}&level=${targetLevelParam}&action=approve`;
-  const rawRejectUrl
+  const rawRejectUrl  = `${WEB_APP_URL_RAW}?row=${row}&level=${targetLevelParam}&action=reject`;
+  const rawHoldUrl    = `${WEB_APP_URL_RAW}?row=${row}&level=${targetLevelParam}&action=hold`;
+
+  const secureApproveUrl = GOOGLE_LOGIN_BRIDGE + encodeURIComponent(rawApproveUrl);
+  const secureRejectUrl  = GOOGLE_LOGIN_BRIDGE + encodeURIComponent(rawRejectUrl);
+  const secureHoldUrl    = GOOGLE_LOGIN_BRIDGE + encodeURIComponent(rawHoldUrl);
+
+  let toEmail = "";
+  let ccEmail = getConfig(`CC_${targetLevelParam}`) || undefined;
+  let subject = "";
+  let htmlBody = "";
+
+  if (level === "L2_SPECIAL" || (level === "L2" && isOverlimitReq)) {
+    const l2EmailHeader = getConfig("HEADER_L2_EMAIL") || "L2 Email Manager";
+    toEmail = rd.get(l2EmailHeader);
+    
+    let ccList = [];
+    if (managerL1Email && managerL1Email.toString().trim() !== "") ccList.push(managerL1Email.toString().trim());
+    const hrAdminCc = getConfig("CC_ALL_HR_ADMIN");
+    if (hrAdminCc && hrAdminCc.toString().trim() !== "") ccList.push(hrAdminCc.toString().trim());
+    ccEmail = ccList.length > 0 ? ccList.join(",") : undefined;
+
+    subject = `[OVERLIMIT DETECTED] [ACTION] Approval Pengajuan Reimbursement - ${empName}`;
+    const historyTableHtml = _getEmployeeHistoryTableHtml(empName, row, rd);
+    const salutationName = managerL2 || "Manajemen";
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+        <p>Dear Pak/Bu ${salutationName},</p>
+        <p>Terdapat pengajuan Overlimit baru atas nama <b>${empName} - ${position}</b> yang sudah diverifikasi awal oleh Tim HR, namun membutuhkan persetujuan dari Anda dikarenakan pengajuan ini melebihi limit toleransi yang ditetapkan (Rp${setLimit}).</p>
+        <p style="margin-bottom:5px; font-weight:bold;">Berikut riwayat pengajuan periode ini:</p>
+        ${historyTableHtml}
+        <p style="margin-top:20px;">Mohon Approvalnya dengan klik salah satu pilihan berikut ini:</p>
+        <table border="0" cellpadding="0" cellspacing="0" style="margin-top:15px; margin-bottom:20px;"><tr>
+          <td style="padding-right: 10px;"><a href="${secureApproveUrl}" style="background:#28a745; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">APPROVED</a></td>
+          <td style="padding-right: 10px;"><a href="${secureRejectUrl}" style="background:#dc3545; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">REJECT</a></td>
+        </tr></table>
+      </div>
+    `;
+  } else {
+    let salutation = "";
+    let contextText = "";
+    subject = `[ACTION] Approval Pengajuan Overlimit Reimbursement - ${empName}`;
+
+    if (level === "HR") {
+      toEmail = getConfig("EMAIL_HR");
+      ccEmail = getConfig("CC_HR") || undefined;
+      salutation = "Team HR";
+      contextText = `Terdapat pengajuan Overlimit baru atas nama <b>${empName}</b> yang membutuhkan verifikasi awal.`;
+    } else if (level === "L1") {
+      toEmail = rd.get(getConfig("HEADER_L1_EMAIL") || "Email Manager");
+      ccEmail = getConfig("CC_ALL_HR_ADMIN") || undefined;
+      salutation = managerL1;
+      contextText = `Tim Anda atas nama <b>${empName} - ${position}</b> melakukan pengajuan Overlimit. Tim HR telah memverifikasi nota.`;
+    } else if (level === "L2") {
+      toEmail = rd.get(getConfig("HEADER_L2_EMAIL") || "L2 Email Manager");
+      ccEmail = getConfig("CC_ALL_HR_ADMIN") || undefined;
+      salutation = managerL2;
+      contextText = `Tim Anda atas nama <b>${empName} - ${position}</b> di naungan tim <b>Pak/Bu ${managerL1}</b> melakukan pengajuan Overlimit. Pengajuan ini telah disetujui Atasan Langsung dengan alasan: <b>${reasonL1}</b>. Kami membutuhkan validasi akhir dari Anda.`;
+    }
+
+    htmlBody = `
+      <div style="font-family: Arial, sans-serif; color: #333;">
+        <p>Dear Pak/Bu ${salutation},</p>
+        <p>${contextText}</p>
+        <table style="border-collapse:collapse; width:100%; max-width:600px; margin-bottom:20px;">
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9; width:30%;"><b>Tanggal</b></td><td style="padding:8px; border:1px solid #ddd;">${timestamp}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Nama</b></td><td style="padding:8px; border:1px solid #ddd;">${empName} (ID: ${empID})</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Posisi</b></td><td style="padding:8px; border:1px solid #ddd;">${position}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Jumlah Pengajuan</b></td><td style="padding:8px; border:1px solid #ddd;">Rp${totalPengajuan}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Limit</b></td><td style="padding:8px; border:1px solid #ddd;">Rp${setLimit}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Total Overlimit Bulan ini</b></td><td style="padding:8px; border:1px solid #ddd;">Rp${totalOver}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Alasan</b></td><td style="padding:8px; border:1px solid #ddd;">${alasan} - ${detail}</td></tr>
+          <tr><td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;"><b>Attachment</b></td><td style="padding:8px; border:1px solid #ddd;">${attachHtml}</td></tr>
+        </table>
+        <p>Mohon Approvalnya dengan klik salah satu pilihan berikut ini:</p>
+        <table border="0" cellpadding="0" cellspacing="0" style="margin-top:25px; margin-bottom:20px;"><tr>
+          <td style="padding-right: 10px;"><a href="${secureApproveUrl}" style="background:#28a745; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">APPROVED</a></td>
+          <td style="padding-right: 10px;"><a href="${secureRejectUrl}" style="background:#dc3545; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">REJECT</a></td>
+          ${level === "HR" ? `<td style="padding-right: 10px;"><a href="\${secureHoldUrl}" style="background:#ffc107; padding:12px 25px; color:#212529; text-decoration:none; border-radius:5px; font-weight:bold;">HOLD</a></td>` : ""}
+        </tr></table>
+      </div>
+    `;
+  }
+
+  if (!toEmail) return;
+
+  let mailOptions = { cc: ccEmail, htmlBody: htmlBody, attachments: emailAttachments, name: aliasConfig.senderName };
+  if (aliasConfig.alias !== "") mailOptions.from = aliasConfig.alias;
+
+  MailApp.sendEmail(toEmail, subject, "", mailOptions);
+}
+
+function sendRejectEmail(row, level) {
+  const sheet = SS.getSheetByName(SHEET_DATA);
+  const rd    = getRowData(row, sheet);
+  
+  const empStatusHeader = getConfig("HEADER_EMPLOYMENT_STATUS") || "Employment Status";
+  const empStatus = (rd.get(empStatusHeader) || "").toString().trim().toLowerCase();
+  
+  let requesterEmail = "";
+  if (empStatus.includes("ex-karyawan")) requesterEmail = rd.get(getConfig("HEADER_REQUESTER") || "Requester Email") || rd.get("Email Address");
+  else requesterEmail = rd.get(getConfig("HEADER_EMP_EMAIL") || "Employee Email") || rd.get("Email Address");
+  
+  if (!requesterEmail || requesterEmail.toString().trim() === "") return;
+
+  const empName      = rd.get(getConfig("HEADER_EMP_NAME")) || "Karyawan";
+  const reasonReject = rd.get(getConfig(`HEADER_REASON_${level.toUpperCase()}`)) || "Tidak ada alasan spesifik.";
+  const rawTimestamp = rd.get("Timestamp");
+  const rawNominal   = rd.get(getConfig("HEADER_NOMINAL"));
+  const alasanOri    = rd.get(getConfig("HEADER_ALASAN")) || "-";
+  const rawAttach    = rd.get(getConfig("HEADER_ATTACH"));
+  const company      = (rd.get(getConfig("HEADER_COMPANY") || "Company") || "").toString().trim();
+
+  let tglFormatted = "-";
+  if (rawTimestamp instanceof Date) tglFormatted = Utilities.formatDate(rawTimestamp, "GMT+7", "dd MMM yyyy");
+  else if (rawTimestamp) {
+    const d = new Date(rawTimestamp);
+    if (!isNaN(d.getTime())) tglFormatted = Utilities.formatDate(d, "GMT+7", "dd MMM yyyy");
+  }
+  
+  const nominalStr = "Rp" + formatRibuan(rawNominal);
+
+  let attachHtml = "";
+  if (rawAttach) {
+    attachHtml = rawAttach.toString().split(",").map(url => {
+      if (url.trim()) return `<a href="${url.trim()}" target="blank" style="color:#2563eb;">${url.trim()}</a>`;
+      return "";
+    }).filter(Boolean).join("<br>");
+  }
+
+  const aliasConfig = getEmailAliasConfig(company);
+  const subject  = `[REJECTION] Pengajuan Overlimit Reimbursement Anda Ditolak`;
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5; max-width: 600px;">
+      <p>Hi <b>${empName}</b>,</p>
+      <p>Mohon maaf, pengajuan reimbursement Anda pada tanggal <b>${tglFormatted}</b> dengan nominal <b>${nominalStr}</b> (Alasan: "${alasanOri}") telah <b>DITOLAK</b> pada tahapan persetujuan <b>${level}</b> dengan alasan:</p>
+      <div style="background-color:#f8d7da; border-left:5px solid #dc3545; padding:15px; margin:15px 0; border-radius:4px;">
+        <p style="margin:0; color:#721c24; font-size:14px;"><b>"${reasonReject}"</b></p>
+      </div>
+      <p>Mohon dapat menghubungi pihak HR untuk melakukan validasi.</p>
+      <p style="margin-top:20px;"><b>Attachment pendukung Anda:</b><br>${attachHtml || "-"}</p>
+      <hr style="border:0; border-top:1px solid #eee; margin-top:25px;">
+      <p style="font-size:11px; color:#777; font-style:italic;">Pesan ini dikirim otomatis oleh Sistem Approval Reimbursement Internal.</p>
+    </div>
+  `;
+
+  let mailOptions = { cc: getConfig("CC_ALL_HR_ADMIN") || undefined, htmlBody: htmlBody, name: aliasConfig.senderName };
+  if (aliasConfig.alias !== "") mailOptions.from = aliasConfig.alias;
+
+  MailApp.sendEmail(requesterEmail, subject, "", mailOptions);
+}
+
+function _getEmployeeHistoryTableHtml(empName, currentReqRow, currentRd) {
+  const sheet = SS.getSheetByName(SHEET_DATA);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toLowerCase());
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return "<p style='color:#777;'>Tidak ada riwayat penggunaan.</p>";
+  
+  const data = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+
+  const idxName = headers.indexOf(getConfig("HEADER_EMP_NAME").toLowerCase());
+  const idxDate = headers.indexOf("timestamp");
+  const idxNominal = headers.indexOf(getConfig("HEADER_NOMINAL").toLowerCase());
+  const idxAlasan = headers.indexOf(getConfig("HEADER_ALASAN").toLowerCase());
+  const idxAttach = headers.indexOf(getConfig("HEADER_ATTACH").toLowerCase());
+
+  let targetMonth = -1, targetYear = -1;
+  const currentTimestamp = currentRd.get("Timestamp");
+  if (currentTimestamp instanceof Date) {
+    targetMonth = currentTimestamp.getMonth(); 
+    targetYear = currentTimestamp.getFullYear();
+  }
+
+  let tableRowsHtml = "", totalAkumulasi = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    const rowNum = i + 2;
+    if (data[i][idxName] && data[i][idxName].toString().trim().toLowerCase() === empName.toString().trim().toLowerCase()) {
+      const rowDateRaw = data[i][idxDate];
+      let rowDateObj = null;
+      if (rowDateRaw instanceof Date) rowDateObj = rowDateRaw;
+
+      if (targetMonth !== -1 && rowDateObj && (rowDateObj.getMonth() !== targetMonth || rowDateObj.getFullYear() !== targetYear)) continue;
+
+      const idxStatus = headers.indexOf((getConfig("HEADER_STATUS") || "Status").toLowerCase());
+      if (idxStatus !== -1 && data[i][idxStatus].toString().trim().toUpperCase() === "REJECTED") continue;
+
+      let dateFormatted = rowDateObj ? Utilities.formatDate(rowDateObj, "GMT+7", "dd MMM yyyy HH:mm") : "-";
+      const numericVal = Number(data[i][idxNominal].toString().replace(/[^0-9.-]+/g, "")) || 0;
+      totalAkumulasi += numericVal;
+
+      const nominalFormatted = "Rp" + new Intl.NumberFormat('en-US').format(numericVal);
+      const alasan = data[i][idxAlasan] || "-";
+      
+      let attachCellHtml = "-";
+      if (data[i][idxAttach]) attachCellHtml = data[i][idxAttach].toString().split(",").map(link => `<a href="${link.trim()}" target="blank" style="color:#2563eb;">Link</a>`).join("<br>");
+      
+      const rowStyle = (rowNum === currentReqRow) ? "background-color: #fff3cd; font-weight: bold;" : "";
+      tableRowsHtml += `<tr style="${rowStyle}"><td style="padding:8px; border:1px solid #cbd5e1;">${dateFormatted}</td><td style="padding:8px; border:1px solid #cbd5e1;">${nominalFormatted}</td><td style="padding:8px; border:1px solid #cbd5e1;">${alasan}</td><td style="padding:8px; border:1px solid #cbd5e1; font-size:11px;">${attachCellHtml}</td></tr>`;
+    }
+  }
+
+  if (!tableRowsHtml) return "<p style='color:#777;'>Tidak ditemukan riwayat pengajuan bulan ini.</p>";
+
+  const grandTotalFormatted = "Rp" + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(totalAkumulasi);
+  return `<table style="border-collapse: collapse; width: 100%; font-size: 13px; color: #333;"><thead><tr style="background-color: #f1f5f9;"><th style="padding:10px; border:1px solid #cbd5e1;">Tanggal</th><th style="padding:10px; border:1px solid #cbd5e1;">Jumlah</th><th style="padding:10px; border:1px solid #cbd5e1;">Alasan</th><th style="padding:10px; border:1px solid #cbd5e1;">Attachment</th></tr></thead><tbody>${tableRowsHtml}<tr style="background-color:#f8fafc;font-weight:bold;"><td style="padding:10px;border:1px solid #cbd5e1;">Total</td><td style="padding:10px;border:1px solid #cbd5e1;color:#b91c1c;">${grandTotalFormatted}</td><td colspan="2" style="border:1px solid #cbd5e1;"></td></tr></tbody></table>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEB APP CONTROLLERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function doGet(e) {
+  try {
+    const row    = (e && e.parameter && e.parameter.row)    ? e.parameter.row.toString().trim()    : "";
+    const action = (e && e.parameter && e.parameter.action) ? e.parameter.action.toString().trim() : "";
+    const level  = (e && e.parameter && e.parameter.level)  ? e.parameter.level.toString().trim()  : "";
+
+    if (!row || !action || !level) return HtmlService.createHtmlOutput("<h3>Error: Parameter URL tidak lengkap.</h3>");
+
+    const sheet = SS.getSheetByName(SHEET_DATA);
+    const rd    = getRowData(parseInt(row), sheet);
+
+    if (!rd.get(getConfig("HEADER_EMP_NAME") || "Employee Name")) return HtmlService.createHtmlOutput("<h3 style='color:#dc3545; text-align:center;'>⚠️ Data Tidak Ditemukan! (Dihapus dari Sheet)</h3>");
+
+    const getLevelStatus = (lvl) => (rd.get(getConfig(`HEADER_${lvl}_STATUS`) || `Approval ${lvl}`) || "").toString().toUpperCase();
+    const isHRApprovedRaw = getLevelStatus("HR") === "APPROVE" || getLevelStatus("HR").includes("SUPPORT SUPER ADMIN");
+    const isL1ApprovedRaw = getLevelStatus("L1") === "APPROVE" || getLevelStatus("L1").includes("BYPASSED") || getLevelStatus("L1").includes("SUPPORT SUPER ADMIN");
+
+    if (level.toUpperCase() === "L1" && !isHRApprovedRaw) return HtmlService.createHtmlOutput("<h3 style='color:red; text-align:center;'>⚠️ Menunggu HR terlebih dahulu.</h3>");
+    if (level.toUpperCase() === "L2" && !isL1ApprovedRaw) return HtmlService.createHtmlOutput("<h3 style='color:red; text-align:center;'>⚠️ Menunggu L1 terlebih dahulu.</h3>");
+
+    if (action === "finance_form") {
+      if (rd.get("Sent to Finance") === "DONE") return HtmlService.createHtmlOutput("<h3 style='color:#dc3545; text-align:center;'>⚠️ Data sudah pernah dikirim ke Finance.</h3>");
+      return showFinanceFormUI(row);
+    }
+
+    const currentLevelStatus = rd.get(getConfig(`HEADER_${level.toUpperCase()}_STATUS`) || "Approval L2");
+    if (currentLevelStatus === "APPROVE" || currentLevelStatus === "REJECT" || (currentLevelStatus && currentLevelStatus.toString().includes("BYPASSED"))) {
+      return HtmlService.createHtmlOutput("<h3 style='text-align:center; margin-top:50px;'>⚠️ Pilihan tidak dapat diubah. Keputusan sudah tersimpan.</h3>");
+    }
+
+    const activeUserEmail = Session.getActiveUser().getEmail() || "";
+    if (activeUserEmail === "") return HtmlService.createHtmlOutput("<h3>❌ Sesi Google Tidak Terdeteksi</h3>");
+
+    const superAdminCfg = getConfig("EMAIL_SUPER_ADMIN") || "";
+    const superAdminList = superAdminCfg.split(",").map(email => email.trim().toLowerCase());
+    const isSuperAdmin = superAdminList.includes(activeUserEmail.toLowerCase());
+
+    let intendedEmail = "";
+    if (level === "HR") intendedEmail = getConfig("EMAIL_HR") || "";
+    else if (level === "L1") intendedEmail = rd.get(getConfig("HEADER_L1_EMAIL") || "Email Manager") || "";
+    else if (level === "L2") intendedEmail = rd.get(getConfig("HEADER_L2_EMAIL") || "L2 Email Manager") || "";
+
+    if (!isSuperAdmin && intendedEmail && !intendedEmail.toLowerCase().includes(activeUserEmail.toLowerCase())) {
+      return HtmlService.createHtmlOutput("<h3>❌ Akses Ditolak! Email Anda tidak berwenang.</h3>");
+    }
+
+    return showReasonForm(row, level, action, isSuperAdmin);
+  } catch (error) {
+    return HtmlService.createHtmlOutput("<h3>Terjadi kesalahan:</h3><pre>" + error.stack + "</pre>");
+  }
+}
+
+function showReasonForm(row, level, action, isSuperAdmin) {
+  const safeAction = action ? action.toString() : "";
+  const actionText = safeAction.toUpperCase();
+  let themeColor = action === "approve" ? "#28a745" : "#dc3545";
+  if (action === "hold") themeColor = "#ffc107";
+
+  const sheet = SS.getSheetByName(SHEET_DATA);
+  const rd = getRowData(parseInt(row), sheet);
+  const nominalAwal = rd.get(getConfig("HEADER_NOMINAL") || "Total Pengajuan") || 0;
+
+  let template = HtmlService.createTemplateFromFile('FormReason');
+  template.row = row;
+  template.level = level;
+  template.action = safeAction;
+  template.actionText = actionText;
+  template.themeColor = themeColor;
+  template.nominalAwal = nominalAwal;
+  template.isSuperAdmin = isSuperAdmin;
+
+  return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function showFinanceFormUI(row) {
+  const sheet = SS.getSheetByName(SHEET_DATA);
+  const rd    = getRowData(parseInt(row), sheet);
+
+  const fmtDate = (v) => (v instanceof Date) ? Utilities.formatDate(v, "GMT+7", "dd MMM yyyy HH:mm:ss") : (v || "-");
+  const rawAmount = rd.get(getConfig("HEADER_NOMINAL") || "Total Pengajuan") || 0;
+
+  const deptRaw = (rd.get("Department") || "").toString().toUpperCase();
+  let deptCode = "OPS";
+  if (deptRaw.includes("COMMERCIAL")) deptCode = "COM";
+  else if (deptRaw.includes("OPERATIONS")) deptCode = "OPS";
+  else deptCode = deptRaw || "DEPT";
+
+  const hrBy = rd.get(getConfig("HEADER_HR_BY") || "Approval HR by") || "-";
+  const hrAt = fmtDate(rd.get(getConfig("HEADER_HR_AT") || "Approval HR at"));
+  const hrReason = rd.get(getConfig("HEADER_REASON_HR") || "Reason By HR") || "-";
+  const l1By = rd.get(getConfig("HEADER_L1_BY") || "Approval L1 by") || "-";
+  const l1At = fmtDate(rd.get(getConfig("HEADER_L1_AT") || "Approval L1 at"));
+  const l1Reason = rd.get(getConfig("HEADER_REASON_L1") || "Reason By L1") || "-";
+  const l2By = rd.get(getConfig("HEADER_L2_BY") || "Approval L2 by") || "-";
+  const l2At = fmtDate(rd.get(getConfig("HEADER_L2_AT") || "Approval L2 at"));
+  const l2Reason = rd.get(getConfig("HEADER_REASON_L2") || "Reason By L2") || "-";
+
+  let template = HtmlService.createTemplateFromFile('FormFinance');
+  template.row = row;
+  template.themeColor = "#007bff";
+  template.company = rd.get(getConfig("HEADER_COMPANY") || "Company") || "-";
+  template.empName = rd.get(getConfig("HEADER_EMP_NAME") || "Employee Name") || "-";
+  template.bankName = rd.get(getConfig("HEADER_NAMA_BANK") || "Nama Bank") || "-";
+  template.bankAccNo = rd.get(getConfig("HEADER_REKENING") || "No Rekening") || "-";
+  template.bankAccName = rd.get(getConfig("HEADER_PEMILIK_BANK") || "Nama Pemilik Rekening") || "-";
+  template.amountFormatted = formatRibuan(rawAmount);
+  template.region = rd.get(getConfig("HEADER_REGION") || "Region") || "-";
+  template.cmDivisi = `${deptCode}`;
+
+  template.logApprovalHtml = `<ul style="list-style-type: disc; margin-left: 20px; padding-left: 10px;">` +
+    `<li style="margin-bottom: 5px;"><b>HR Approved by:</b> ${hrBy} at ${hrAt} dengan catatan ${hrReason}</li>` +
+    `<li style="margin-bottom: 5px;"><b>Direct Manager by:</b> ${l1By} at ${l1At} dengan alasan ${l1Reason}</li>` +
+    `<li style="margin-bottom: 5px;"><b>Head Business by:</b> ${l2By} at ${l2At} dengan alasan ${l2Reason}</li>` +
+  `</ul>`;
+  
+  const rawLog = `HR Approved: ${hrBy} at ${hrAt} (${hrReason})\nL1 Approved: ${l1By} at ${l1At} (${l1Reason})\nL2 Approved: ${l2By} at ${l2At} (${l2Reason})`;
+  template.base64LogApproval = Utilities.base64Encode(rawLog, Utilities.Charset.UTF_8);
+
+  return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function executeApprovalFromWeb(data) {
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch(e) { return "<h3 style='color:red;'>❌ Sistem sibuk, coba beberapa saat lagi.</h3>"; }
+
+  try {
+    const row       = parseInt(data.row);
+    const sheet     = SS.getSheetByName(SHEET_DATA);
+    const rd        = getRowData(row, sheet);
+    
+    if (!rd.get("Employee Name")) return "<h3 style='color:#dc3545;'>❌ Gagal: Data sudah dihapus dari sistem.</h3>";
+
+    const headers   = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const userEmail = Session.getActiveUser().getEmail() || "Authorized User";
+
+    const superAdminCfg = getConfig("EMAIL_SUPER_ADMIN") || "";
+    const superAdminList = superAdminCfg.split(",").map(email => email.trim().toLowerCase());
+    const isSuperAdmin = superAdminList.includes(userEmail.toLowerCase());
+
+    let approverNameLog = userEmail; 
+    
+    if (isSuperAdmin) {
+      let fileUrl = "";
+      if (data.fileBase64 && data.fileMimeType && data.fileName) {
+        try {
+          // GANTI DENGAN FOLDER ID DRIVE SUPER ADMIN ANDA
+          const folderId = "YOUR_SUPERADMIN_FOLDER_ID_HERE"; 
+          const fileBlob = Utilities.newBlob(Utilities.base64Decode(data.fileBase64), data.fileMimeType, `Bukti_SuperAdmin_Row_${row}_${data.fileName}`);
+          const uploadedFile = DriveApp.getFolderById(folderId).createFile(fileBlob);
+          fileUrl = uploadedFile.getUrl();
+        } catch (errUpload) {}
+      }
+      
+      if (fileUrl !== "") approverNameLog = `=HYPERLINK("${fileUrl}", "Support by Super Admin")`;
+      else approverNameLog = "Support by Super Admin (Tanpa Lampiran)";
+    }
+
+    const reasonHeaderKey = `HEADER_REASON_${data.level.toUpperCase()}`;
+    const reasonHeader    = (getConfig(reasonHeaderKey) || `Reason By ${data.level.toUpperCase()}`).toString().trim().toLowerCase();
+    const colReason       = headers.map(h => h.toString().trim().toLowerCase()).indexOf(reasonHeader) + 1;
+    if (colReason > 0) sheet.getRange(row, colReason).setValue(data.reason);
+
+    let statusText = data.action === "approve" ? "APPROVE" : (data.action === "reject" ? "REJECT" : "HOLD");
+    if (isSuperAdmin) {
+      if (data.action === "approve") statusText = "APPROVE - SUPPORT SUPER ADMIN";
+      else if (data.action === "reject") statusText = "REJECTED - SUPPORT SUPER ADMIN"; 
+    }
+
+    if (data.action === "hold") {
+      updateApprovalRow(row, data.level, statusText, new Date(), approverNameLog, headers, sheet);
+      const colStatus = headers.map(h => h.toString().trim().toLowerCase()).indexOf((getConfig("HEADER_STATUS") || "Status").toLowerCase()) + 1;
+      if (colStatus > 0) sheet.getRange(row, colStatus).setValue("HOLD");
+      const colHoldDate = headers.map(h => h.toString().trim().toLowerCase()).indexOf("tgl reminder hold") + 1;
+      if (colHoldDate > 0 && data.holdDate) sheet.getRange(row, colHoldDate).setValue(new Date(data.holdDate));
+      SpreadsheetApp.flush();
+      return "<h3 style='color:#ffc107;'>🟡 Sukses! Status di-HOLD internal oleh Super Admin.</h3>";
+    }
+
+    if (data.action === "approve") {
+      if (data.level === "HR" && data.newNominal) {
+        const colNominal = rd.colIdx(getConfig("HEADER_NOMINAL") || "Total Pengajuan") + 1;
+        if (colNominal > 0) sheet.getRange(row, colNominal).setValue(Number(data.newNominal.replace(/[^0-9.-]+/g, "")));
+      }
+      const colStatus = headers.map(h => h.toString().trim().toLowerCase()).indexOf((getConfig("HEADER_STATUS") || "Status").toLowerCase()) + 1;
+      if (colStatus > 0) sheet.getRange(row, colStatus).setValue(""); 
+
+      updateApprovalRow(row, data.level, statusText, new Date(), approverNameLog, headers, sheet);
+      SpreadsheetApp.flush();
+      
+      lock.releaseLock(); 
+      processRow(row); 
+      return `<h3 style='color:#28a745;'>✔️ Sukses! Aksi ${statusText} berhasil dicatat.</h3>`;
+    } 
+    
+    else {
+      updateApprovalRow(row, data.level, statusText, new Date(), approverNameLog, headers, sheet);
+      const colStatus = headers.map(h => h.toString().trim().toLowerCase()).indexOf((getConfig("HEADER_STATUS") || "").toString().trim().toLowerCase()) + 1;
+      if (colStatus > 0) sheet.getRange(row, colStatus).setValue("REJECTED");
+      sendRejectEmail(row, data.level); 
+      SpreadsheetApp.flush();
+      return `<h3 style='color:#dc3545;'>❌ Permohonan telah di-${statusText}.</h3>`;
+    }
+  } catch(e) {
+    return "<h3 style='color:red;'>❌ Terjadi kesalahan sistem internal.</h3>";
+  } finally {
+    try { lock.releaseLock(); } catch(_) {}
+  }
+}
+
+function executeFinanceFormSubmission(data) {
+  try {
+    const row     = parseInt(data.row);
+    const sheet   = SS.getSheetByName(SHEET_DATA);
+    const rd      = getRowData(row, sheet);
+
+    if (!rd.get("Employee Name")) return `<h3 style='color:#dc3545;'>❌ Gagal Memproses Form: Data hilang.</h3>`;
+    if (rd.get("Sent to Finance") === "DONE") return `<h3 style='color:#dc3545;'>❌ Gagal: Data sudah dikirim ke Finance.</h3>`;
+
+    const fileBlob = Utilities.newBlob(Utilities.base64Decode(data.base64), data.mimeType, `Bukti_Submital_Row_${row}_${data.fileName}`);
+    const uploadedFile = DriveApp.getFolderById(FOLDER_SCREENSHOT_ID).createFile(fileBlob);
+    
+    const colLampiranFinanceIdx = rd.colIdx("Lampiran ke Finance");
+    if (colLampiranFinanceIdx !== -1) sheet.getRange(row, colLampiranFinanceIdx + 1).setValue(uploadedFile.getUrl());
+
+    const attachmentsArray = [uploadedFile.getBlob()];
+    const rawAttach = rd.get("Lampiran Pendukung");
+    if (rawAttach) {
+      rawAttach.toString().split(",").forEach(link => {
+        const match = link.trim().match(/[-\w]{25,}/);
+        if (match) { try { attachmentsArray.push(DriveApp.getFileById(match[0]).getBlob()); } catch (e) {} }
+      });
+    }
+
+    const company = rd.get("Company") || "-", empName = rd.get("Employee Name") || "-";
+    const finalAmtFormatted = formatRibuan(rd.get(getConfig("HEADER_NOMINAL")) || 0);
+    const financeEmailTarget = getConfig("EMAIL_FINANCE");
+
+    if (!financeEmailTarget) return "<h3 style='color:red;'>❌ Konfigurasi email Finance tidak ditemukan.</h3>";
+
+    // SLA FINANCE DUE DATE CALCULATION
+    const nowSubmitDate = new Date();
+    const day = nowSubmitDate.getDay(); 
+    const hour = nowSubmitDate.getHours();
+    let dueDate = new Date(nowSubmitDate);
+    let addDays = 0;
+
+    if ((day === 4 && hour >= 16) || day === 5 || day === 6 || day === 0 || (day === 1 && hour < 16)) {
+      if (day === 4) addDays = 7;     
+      else if (day === 5) addDays = 6; 
+      else if (day === 6) addDays = 5; 
+      else if (day === 0) addDays = 4; 
+      else if (day === 1) addDays = 3; 
+    } else {
+      if (day === 1) addDays = 8;     
+      else if (day === 2) addDays = 7; 
+      else if (day === 3) addDays = 6; 
+      else if (day === 4) addDays = 5; 
+    }
+
+    dueDate.setDate(nowSubmitDate.getDate() + addDays);
+    const dueDateFormatted = Utilities.formatDate(dueDate, "GMT+7", "EEE, dd MMM yyyy");
+    
+    const colDueDateFinanceIdx = rd.colIdx("Due Date Finance");
+    if (colDueDateFinanceIdx !== -1) {
+      sheet.getRange(row, colDueDateFinanceIdx + 1).setValue(dueDateFormatted);
+    }
+
+    const financeHtmlBody = `
+      <div style="font-family:Arial, sans-serif; line-height:1.5; color:#333;">
+        <p>Dear Finance,</p>
+        <p>Mohon diproses untuk pengajuan disbursement atas nama <b>${empName} (${company})</b> sebesar <b>Rp${finalAmtFormatted}</b>.</p>
+        
+        <div style="background-color:#fff3cd; border-left:5px solid #ffc107; padding:12px; margin:15px 0; border-radius:4px;">
+          <p style="margin:0; font-size:14px; color:#856404;">
+            📅 <b>Estimasi Jadwal Pencairan (Due Date):</b> <span style="font-weight:bold; color:#d9534f;">${dueDateFormatted}</span><br>
+            <small><i>(Dihitung otomatis berdasarkan SLA waktu submit form Finance Control)</i></small>
+          </p>
+        </div>
+
+        <p><b>Log Approval Internal Manajemen:</b><br>
+        <i style="white-space:pre-line; color:#555; background:#f8fafc; display:block; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">${data.logApproval}</i></p>
+      </div>
+    `;
+
+    const targetEmail = String(financeEmailTarget || "").trim();
+    if (!targetEmail) throw new Error("Email Finance tidak terkonfigurasi atau bernilai kosong.");
+    const validAttachments = (attachmentsArray || []).filter(item => item != null);
+
+    MailApp.sendEmail({
+      to:          targetEmail,
+      subject:     `[REIMBURSEMENT] Overlimit Form - ${empName}`,
+      htmlBody:    financeHtmlBody,
+      attachments: validAttachments
+    });
+    
+    const colSentFinanceIdx = rd.colIdx("Sent to Finance");
+    if (colSentFinanceIdx !== -1) sheet.getRange(row, colSentFinanceIdx + 1).setValue("DONE");
+
+    SpreadsheetApp.flush();
+    return `<h3 style='color:#28a745;'>✔️ Pengajuan Berhasil Disubmit ke Finance! (Due Date: ${dueDateFormatted})</h3>`;
+
+  } catch (error) {
+    return `<h3 style='color:red;'>❌ Gagal Memproses Form</h3><p>${error.toString()}</p>`;
+  }
+}
+
+function cekReminderHold() {
+  const ws = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATA);
+  if (!ws) return;
+  const data = ws.getDataRange().getValues();
+  const headers = data[0];
+
+  const statusIdx   = headers.indexOf(getConfig("HEADER_STATUS") || "Status");
+  const holdDateIdx = headers.indexOf(getConfig("HEADER_HR_AT"));
+  const hrStatusIdx = headers.indexOf(getConfig("HEADER_HR_STATUS") || "Approval HR");
+
+  if (statusIdx === -1 || holdDateIdx === -1) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][statusIdx] === "HOLD") {
+      const hDate = data[i][holdDateIdx];
+      
+      if (hDate instanceof Date) {
+        const targetHoldDate = new Date(hDate);
+        targetHoldDate.setHours(0, 0, 0, 0);
+        
+        if (today.getTime() >= targetHoldDate.getTime()) {
+          const currentRow = i + 1;
+          sendApprovalEmail(currentRow, "HR"); 
+          
+          if (hrStatusIdx !== -1) ws.getRange(currentRow, hrStatusIdx + 1).setValue("SENT TO HR");
+          ws.getRange(currentRow, statusIdx + 1).setValue(""); 
+          ws.getRange(currentRow, holdDateIdx + 1).setValue(""); 
+          
+          SpreadsheetApp.flush();
+        }
+      }
+    }
+  }
+}
+
+function resendRejectEmailViaPrompt() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('Kirim Ulang Email Penolakan', 'Masukkan NOMOR BARIS data di Spreadsheet yang ingin dikirim ulang email reject-nya:', ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const inputRow = response.getResponseText().trim();
+    const targetRow = parseInt(inputRow, 10);
+
+    if (isNaN(targetRow) || targetRow < 2) {
+      ui.alert('❌ Error', 'Nomor baris tidak valid! Silakan masukkan angka baris yang benar (minimal baris 2).', ui.ButtonSet.OK);
+      return;
+    }
+
+    try {
+      sendRejectEmail(targetRow, "HR"); 
+      ui.alert('✅ Berhasil', `Email penolakan untuk BARIS ${targetRow} telah berhasil dikirim ulang.`, ui.ButtonSet.OK);
+    } catch (error) {
+      ui.alert('❌ Gagal', `Terjadi kesalahan saat mengirim email: ${error.message}`, ui.ButtonSet.OK);
+    }
+  }
+}
