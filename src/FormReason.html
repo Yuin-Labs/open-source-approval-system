@@ -1,1 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; background-color: #f8f9fa; }
+      .container {
+        max-width: 500px; margin: 30px auto; background: white; padding: 25px;
+        border-radius: 8px; border-top: 5px solid <?= themeColor ?>;
+      }
+      textarea, input[type="text"], input[type="datetime-local"] {
+        width: 100%; padding: 10px; border: 1px solid #ccc;
+        border-radius: 4px; box-sizing: border-box; margin-bottom: 12px;
+      }
+      button {
+        background: <?= themeColor ?>; color: <?= action === 'hold' ? '#212529' : 'white' ?>;
+        padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer;
+        width: 100%; font-weight: bold; margin-top: 15px;
+      }
+      .field-label { font-weight: bold; display: block; margin-bottom: 6px; font-size: 14px; color: #333; }
+      .special-box { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+      .hold-box { background: #fffbeb; border-color: #fef08a; }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="formContainer">
+      <h2>Konfirmasi <?= actionText ?></h2>
+      
+      <? if (level === "HR" && action === "approve") { ?>
+        <div class="special-box">
+          <label class="field-label">✏️ Edit Total Pengajuan (Jika Diperlukan):</label>
+          <input type="text" id="newNominalInput" value="<?= nominalAwal ?>">
+        </div>
+      <? } ?>
 
+      <? if (level === "HR" && action === "hold") { ?>
+        <div class="special-box hold-box">
+          <label class="field-label">📅 Input Tanggal & Jam Reminder Hold:</label>
+          <input type="datetime-local" id="tglHold" required>
+        </div>
+      <? } ?>
+
+      <? if (isSuperAdmin) { ?>
+        <div style="margin-bottom: 15px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 5px;">Upload Bukti Support Super Admin (PDF/JPG/PNG):</label>
+          <input type="file" id="superAdminFile" accept=".pdf, .jpg, .jpeg, .png" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+      <? } ?>
+
+      <label class="field-label">Berikan Justifikasi/Alasan Anda (Wajib):</label>
+      <textarea id="reasonInput" rows="4" placeholder="Tulis catatan Anda di sini..."></textarea>
+      
+      <button onclick="submitData()">SUBMIT KEPUTUSAN</button>
+    </div>
+    
+    <script>
+      function submitData() {
+        const reason = document.getElementById('reasonInput').value.trim();
+        if (!reason) return alert('Alasan wajib diisi!');
+        
+        const newNominalEl = document.getElementById('newNominalInput');
+        const holdDateEl   = document.getElementById('tglHold');
+        const fileInput    = document.getElementById('superAdminFile'); 
+
+        const payload = {
+          row: "<?= row ?>",
+          level: "<?= level ?>",
+          action: "<?= action ?>",
+          reason: reason,
+          newNominal: newNominalEl ? newNominalEl.value.trim() : "",
+          holdDate: holdDateEl ? holdDateEl.value : "",
+          fileBase64: "", fileMimeType: "", fileName: ""
+        };
+
+        if (payload.action === 'hold' && !payload.holdDate) {
+          return alert('Tanggal reminder wajib diisi untuk status HOLD!');
+        }
+
+        if (fileInput && fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          
+          document.getElementById('formContainer').innerHTML = "<h3>⏳ Sedang memproses dokumen...</h3>";
+
+          reader.onload = function(e) {
+            payload.fileBase64   = e.target.result.split(',')[1];
+            payload.fileMimeType = file.type;
+            payload.fileName     = file.name;
+            sendPayloadToBackend(payload);
+          };
+
+          reader.onerror = function() {
+            alert("Gagal membaca file bukti support.");
+            window.location.reload();
+          };
+          reader.readAsDataURL(file);
+        } else {
+          sendPayloadToBackend(payload);
+        }
+      }
+
+      function sendPayloadToBackend(payload) {
+        google.script.run
+          .withSuccessHandler(res => { document.getElementById('formContainer').innerHTML = res; })
+          .withFailureHandler(err => { alert("Kesalahan sistem: " + err.message); })
+          .executeApprovalFromWeb(payload);
+      }
+    </script>
+  </body>
+</html>
