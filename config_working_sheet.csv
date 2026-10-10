@@ -1,0 +1,13 @@
+Target Header,Source Header,Source Sheet,Formula
+Timestamp,Timestamp,Form Responses 1,
+Email Address,Email Address,Form Responses 1,
+Employee Name,Nama Lengkap,Form Responses 1,
+Position,Posisi,empdb,
+Department,Department,empdb,
+Manager Name,Manager Name,empdb,
+L2 Manager,L2 Manager,empdb,
+Total Pengajuan,Total Pengajuan,Form Responses 1,
+Alasan,Alasan Overlimit,Form Responses 1,
+Detail,Detil Alasan Overlimit,Form Responses 1,
+Lampiran Pendukung,Lampiran Pendukung,Form Responses 1,
+Status,status to working sheet,Form Responses 1,

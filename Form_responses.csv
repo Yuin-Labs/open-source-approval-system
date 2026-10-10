@@ -1,0 +1,3 @@
+Timestamp,Email Address,Email Perusahaan,Nama Lengkap,Posisi,Tanggal Transaksi,Total Pengajuan,Alasan Overlimit,Detil Alasan Overlimit,Lampiran Pendukung,Bulan Transaksi,status to working sheet
+4/30/2026 16:12:54,user1@company.com,user1@company.com,John Doe,Sales Executive,4/29/2026,911000,Tambahan Kegiatan Diluar Rencana,Visit tambahan klien jarak jauh lebih dari 300km,https://drive.google.com/file/d/1wOdyLQ3RrwIKBVoRSR4tLZIIwRXhPdjx/view,April,DONE
+05/01/2026 9:30:00,user2@company.com,user2@company.com,Alice Wong,Operations Staff,4/30/2026,1500000,Kebutuhan Mendadak Operasional,Pembelian perlengkapan gudang darurat,https://drive.google.com/file/d/1kxjmuvgf8MVbGxsQPbB5YO6M67MVEeRk/view,Mei,
