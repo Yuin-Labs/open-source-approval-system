@@ -1,1 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; background-color: #f8f9fa; color: #333; }
+      .container { max-width: 600px; margin: 20px auto; background: white; padding: 25px; border-radius: 8px; border-top: 5px solid <?= themeColor ?>; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+      .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+      .info-table td { padding: 8px; border-bottom: 1px solid #eee; }
+      .info-table td.label { font-weight: bold; width: 40%; color: #555; }
+      .log-box { background: #f1f5f9; padding: 15px; border-radius: 6px; font-size: 13px; margin-bottom: 20px; }
+      .log-box ul { list-style-type: disc !important; padding-left: 20px !important; margin: 10px 0 !important; }
+      .log-box li { display: list-item !important; margin-bottom: 5px !important; }
+      input[type="file"] { width: 100%; padding: 10px; margin-bottom: 15px; }
+      button { background: <?= themeColor ?>; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="financeContainer">
+      <h2>Form Disbursement Finance</h2>
+      <p>Silakan periksa data pengajuan di bawah ini dan unggah bukti transfer/disbursement.</p>
+      
+      <table class="info-table">
+        <tr><td class="label">Nama Karyawan</td><td><?= empName ?></td></tr>
+        <tr><td class="label">Perusahaan</td><td><?= company ?></td></tr>
+        <tr><td class="label">Region / Divisi</td><td><?= region ?> (<?= cmDivisi ?>)</td></tr>
+        <tr><td class="label">Total Pembayaran</td><td><b>Rp<?= amountFormatted ?></b></td></tr>
+        <tr><td class="label">Bank Tujuan</td><td><?= bankName ?></td></tr>
+        <tr><td class="label">No. Rekening</td><td><?= bankAccNo ?></td></tr>
+        <tr><td class="label">Pemilik Rekening</td><td><?= bankAccName ?></td></tr>
+      </table>
 
+      <h3>Riwayat Log Persetujuan:</h3>
+      <div class="log-box">
+        <?!= logApprovalHtml ?>
+      </div>
+
+      <label style="font-weight:bold; display:block; margin-bottom:8px;">📸 Upload Bukti Transfer (Format Gambar/PDF):</label>
+      <input type="file" id="receiptFile" accept="image/*,application/pdf">
+      
+      <button onclick="submitFinance()">SUBMIT BUKTI TRANSFER</button>
+    </div>
+
+    <script>
+      function submitFinance() {
+        const fileInput = document.getElementById('receiptFile');
+        if (fileInput.files.length === 0) return alert('Wajib mengunggah bukti transfer!');
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          const base64Data = e.target.result.split(',')[1];
+          const payload = {
+            row: "<?= row ?>",
+            fileName: file.name,
+            mimeType: file.type,
+            base64: base64Data,
+            logApproval: b64DecodeUnicode("<?= base64LogApproval ?>")
+          };
+
+          document.getElementById('financeContainer').innerHTML = "<h3>🔄 Mengirim data ke Finance...</h3>";
+
+          google.script.run
+            .withSuccessHandler(res => document.getElementById('financeContainer').innerHTML = res)
+            .executeFinanceFormSubmission(payload);
+        };
+        
+        reader.readAsDataURL(file);
+      }
+
+      function b64DecodeUnicode(str) {
+        return decodeURIComponent(atob(str).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+      }
+    </script>
+  </body>
+</html>
