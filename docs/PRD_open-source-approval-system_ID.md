@@ -1,6 +1,6 @@
 # PRD — Open Source Serverless Approval System (Reimbursement Overlimit)
 > **Version:** 1.0.0 | **Status:** 🟡 Draft | **Last Updated:** 2026-10-17  
-> **Author:** indarto.b@gmail.com (peminta) | **Reviewer:** [TBD] | **Stakeholder:** [TBD]
+> **Author:** bayundrt@gmail.com (peminta) | **Reviewer:** [TBD] | **Stakeholder:** [TBD]
 
 ---
 
@@ -1159,7 +1159,7 @@ Pertanyaan dan asumsi yang perlu dikonfirmasi sebelum atau selama development. B
 
 | Versi | Tanggal | Perubahan | Author |
 |-------|---------|-----------|--------|
-| 1.0.0 | 2026-10-17 | Dokumen awal dibuat dari analisis repositori | indarto.b@gmail.com |
+| 1.0.0 | 2026-10-17 | Dokumen awal dibuat dari analisis repositori | bayundrt@gmail.com |
 
 ---
 
