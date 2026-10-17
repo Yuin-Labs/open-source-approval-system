@@ -1159,7 +1159,7 @@ Questions and assumptions that need confirmation before or during development. R
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
-| 1.0.0 | 2026-10-17 | Initial document created from repository analysis | indarto.b@gmail.com |
+| 1.0.0 | 2026-10-17 | Initial document created from repository analysis | bayundrt@gmail.com |
 
 ---
 
