@@ -1,15 +1,13 @@
-
 /**
-- Fungsi Utama untuk memindahkan data secara dinamis berdasarkan konfigurasi
-- dari sheet "Config to Report" dengan filter Status DONE & penanda Move to report.
-*/
+ * Fungsi Utama untuk memindahkan data secara dinamis berdasarkan konfigurasi
+ * dari sheet "Config to Report" dengan filter Status DONE & penanda Move to report.
+ */
 function moveWorkingDataToRawData() {
-  // GANTI DENGAN SPREADSHEET ID ANDA
-  const SOURCE_SS_ID = "YOUR_SOURCE_SS_ID_HERE";
+  const SOURCE_SS_ID = "1WVNnlWot_dQJVj8MdvtQLJrtNpomy0kMEsCFfAYl4hc";
   const SOURCE_SHEET_NAME = "Working Sheet";
   const CONFIG_SHEET_NAME = "Config to Report";
   
-  // GANTI DENGAN SPREADSHEET ID TARGET (ARCHIVE) ANDA
+  // GANTI DENGAN SPREADSHEET ID TARGET (ARCHIVE) ANDA SEBELUM MENJALANKAN MENU REPORT
   const TARGET_SS_ID = "YOUR_TARGET_SS_ID_HERE";
   const TARGET_SHEET_NAME = "Raw Data Overlimit Reimbursement";
 
