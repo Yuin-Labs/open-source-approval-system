@@ -4,17 +4,21 @@
  * ====================================================================================
  */
 
-const SS                    = SpreadsheetApp.getActiveSpreadsheet();
+const SPREADSHEET_ID        = "1WVNnlWot_dQJVj8MdvtQLJrtNpomy0kMEsCFfAYl4hc";
 const SHEET_DATA            = "Working Sheet";
 const SHEET_RESPONSES       = "Form Responses 1";
 const SHEET_CONFIG          = "Config";
 const SHEET_CONFIG_WORKING  = "Config Working Sheet";
 
-// GANTI DENGAN FOLDER ID DRIVE UNTUK MENYIMPAN LAMPIRAN
-const FOLDER_SCREENSHOT_ID  = "YOUR_DRIVE_FOLDER_ID_HERE"; 
+function getSS() {
+  return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+// ID FOLDER DRIVE UNTUK MENYIMPAN LAMPIRAN FINANCE
+const FOLDER_SCREENSHOT_ID  = "1E8aoEh-FxgwHdZHL-pn7FRBtpo-j28nn"; 
 
 // GANTI DENGAN URL WEB APP DEPLOYMENT ANDA
-const WEB_APP_URL_RAW       = "YOUR_WEB_APP_URL_RAW_HERE";
+const WEB_APP_URL_RAW       = "https://script.google.com/macros/s/AKfycbxw_YyJHt4R4rxcLq6cUyK45jaj8UEvqQRXzfDJAvXdLyuly4sEr_LMvP3HLdQJ-qRujA/exec";
 const GOOGLE_LOGIN_BRIDGE   = "https://accounts.google.com/AccountChooser?continue=";
 const WEB_APP_URL           = GOOGLE_LOGIN_BRIDGE + encodeURIComponent(WEB_APP_URL_RAW);
 
@@ -27,7 +31,7 @@ let _configCache = null;
 function getConfig(key) {
   if (!_configCache) {
     _configCache = {};
-    const configSheet = SS.getSheetByName(SHEET_CONFIG);
+    const configSheet = getSS().getSheetByName(SHEET_CONFIG);
     if (!configSheet) return null; 
     const data = configSheet.getDataRange().getValues();
     for (let i = 0; i < data.length; i++) {
@@ -96,7 +100,7 @@ function onFormSubmit(e) {
 }
 
 function runManualForAllPending() {
-  const respSheet   = SS.getSheetByName(SHEET_RESPONSES);
+  const respSheet   = getSS().getSheetByName(SHEET_RESPONSES);
   const respHeaders = respSheet.getRange(1, 1, 1, respSheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toLowerCase());
   const lastRowResp = respSheet.getLastRow();
   const timestampIdx = respHeaders.indexOf("timestamp");
@@ -104,7 +108,7 @@ function runManualForAllPending() {
 
   if (timestampIdx !== -1 && statusToWorkingIdx !== -1) {
     for (let rRow = 2; rRow <= lastRowResp; rRow++) {
-      if (!respSheet.getRange(rRow, timestampIdx + 1).getValue()) break;
+      if (!respSheet.getRange(rRow, timestampIdx + 1).getValue()) continue;
       if (respSheet.getRange(rRow, statusToWorkingIdx + 1).getValue() !== "DONE") {
         moveResponseToWorkingSheet(rRow, false); 
       }
@@ -113,12 +117,12 @@ function runManualForAllPending() {
 
   SpreadsheetApp.flush(); 
 
-  const workSheet   = SS.getSheetByName(SHEET_DATA);
+  const workSheet   = getSS().getSheetByName(SHEET_DATA);
   const workHeaders = workSheet.getRange(1, 1, 1, workSheet.getLastColumn()).getValues()[0];
   const lastRowWork = workSheet.getLastRow();
 
   for (let wRow = 2; wRow <= lastRowWork; wRow++) {
-    if (!workSheet.getRange(wRow, 1).getValue()) break;
+    if (!workSheet.getRange(wRow, 1).getValue()) continue;
     const status = getValueByHeader(wRow, getConfig("HEADER_STATUS"), workHeaders, workSheet);
     
     if (!status || (status !== "DONE" && status !== "REJECTED" && status !== "HOLD")) {
@@ -136,10 +140,10 @@ function moveResponseToWorkingSheet(responseRow, autoProcess = true) {
   try { lock.waitLock(15000); } catch (e) { return; }
 
   try {
-    const respSheet   = SS.getSheetByName(SHEET_RESPONSES);
-    const workSheet   = SS.getSheetByName(SHEET_DATA);
-    const configSheet = SS.getSheetByName(SHEET_CONFIG_WORKING);
-    const empdbSheet  = SS.getSheetByName("empdb");
+    const respSheet   = getSS().getSheetByName(SHEET_RESPONSES);
+    const workSheet   = getSS().getSheetByName(SHEET_DATA);
+    const configSheet = getSS().getSheetByName(SHEET_CONFIG_WORKING);
+    const empdbSheet  = getSS().getSheetByName("empdb");
 
     const respHeaders  = respSheet.getRange(1, 1, 1, respSheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toLowerCase());
     const workHeaders  = workSheet.getRange(1, 1, 1, workSheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toLowerCase());
@@ -229,7 +233,7 @@ function processRow(row) {
 
 function _processRowInternal(row) {
   const MAX_ITERATIONS = 5;
-  const sheet          = SS.getSheetByName(SHEET_DATA);
+  const sheet          = getSS().getSheetByName(SHEET_DATA);
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const rd = getRowData(row, sheet);
@@ -237,34 +241,40 @@ function _processRowInternal(row) {
     
     if (status === "REJECTED" || status === "DONE" || status === "HOLD") return;
 
-    const hr          = (rd.get(getConfig("HEADER_HR_STATUS")) || "").toString().trim().toUpperCase();
-    const l1          = (rd.get(getConfig("HEADER_L1_STATUS")) || "").toString().trim().toUpperCase();
+    const hr           = (rd.get(getConfig("HEADER_HR_STATUS")) || "").toString().trim().toUpperCase();
+    const l1           = (rd.get(getConfig("HEADER_L1_STATUS")) || "").toString().trim().toUpperCase();
     const l2HeaderName = getConfig("HEADER_L2_STATUS") || "Approval L2";
-    const l2          = (rd.get(l2HeaderName) || "").toString().trim().toUpperCase();
-    const company     = (rd.get(getConfig("HEADER_COMPANY") || "Company") || "").toString().trim().toLowerCase();
+    const l2           = (rd.get(l2HeaderName) || "").toString().trim().toUpperCase();
+    const company      = (rd.get(getConfig("HEADER_COMPANY") || "Company") || "").toString().trim().toLowerCase();
 
     const parseCleanNumber = (val) => {
-      if (val === "" || val === null || val === undefined) return 0;
+      if (val == null || val === "") return 0;
       return parseFloat(val.toString().replace(/[^0-9.-]+/g, "")) || 0;
     };
-
-    const currentUsage = parseCleanNumber(rd.get(getConfig("HEADER_TOTAL_OVER") || "Current Usage"));
-    const limit        = parseCleanNumber(rd.get(getConfig("HEADER_LIMIT") || "Limit"));
-    const isOverlimit  = currentUsage > limit;
+    const currentUsageNum  = parseCleanNumber(rd.get(getConfig("HEADER_TOTAL_OVER") || "Current Usage"));
+    const limitNum         = parseCleanNumber(rd.get(getConfig("HEADER_LIMIT") || "Limit"));
+    const isOverlimitReq   = currentUsageNum > limitNum;
 
     // TAHAP 1: HR
-    if (hr === "" || hr === "SENT TO HR" || hr.length === 0) {
-      if (hr === "" || hr.length === 0) {
+    if (hr === "" || hr.startsWith("EMAIL FAILED")) {
+      try {
+        sendApprovalEmail(row, "HR");
         _setColValue(sheet, row, rd, getConfig("HEADER_HR_STATUS"), "SENT TO HR");
         SpreadsheetApp.flush();
+      } catch (err) {
+        _setColValue(sheet, row, rd, getConfig("HEADER_HR_STATUS"), "EMAIL FAILED: " + err.message);
+        console.error(err.stack);
       }
-      sendApprovalEmail(row, "HR");
-      return; 
+      return;
     }
+    if (hr === "SENT TO HR") return; // menunggu keputusan HR, jangan kirim ulang
 
     // TAHAP 2: L1 MANAGER
-    if ((hr === "APPROVE" || hr.includes("SUPPORT SUPER ADMIN")) && (l1 === "" || l1.length === 0)) {
+    if ((hr === "APPROVE" || hr.includes("SUPPORT SUPER ADMIN")) && l1 === "") {
+      const sentAtCol = rd.colIdx("L1 Email Sent At");
+      if (sentAtCol !== -1 && rd.values[sentAtCol]) return; // sudah terkirim
       sendApprovalEmail(row, "L1");
+      if (sentAtCol !== -1) sheet.getRange(row, sentAtCol + 1).setValue(new Date());
       return;
     }
 
@@ -273,7 +283,7 @@ function _processRowInternal(row) {
       
       const isCompanyNormalFlow = company.includes("company a"); 
 
-      if (isCompanyNormalFlow && !isOverlimit) {
+      if (isCompanyNormalFlow && !isOverlimitReq) {
         _updateApprovalRowDirect(row, "L2", "BYPASSED (Normal Flow)", new Date(), "System", sheet, rd);
         SpreadsheetApp.flush();
         continue; 
@@ -373,7 +383,7 @@ function getEmailAliasConfig(companyStr) {
   let config = { alias: "", senderName: "Overlimit Approval System" };
   const company = companyStr.toLowerCase();
   
-  // Ubah logika ini sesuai domain perusahaan
+  // Ubah logika ini sesuai domain perusahaan (pastikan alias terdaftar di Gmail Send Mail As)
   if (company.includes("company a")) {
     config.alias = "admin@companya.com";
     config.senderName = "HR Admin Company A";
@@ -422,7 +432,7 @@ function sendRequesterDoneEmail(row, headers, sheet) {
 }
 
 function sendHRFinanceFormEmail(row) {
-  const sheet   = SS.getSheetByName(SHEET_DATA);
+  const sheet   = getSS().getSheetByName(SHEET_DATA);
   const rd      = getRowData(row, sheet);
   const empName = rd.get(getConfig("HEADER_EMP_NAME"));
   const toEmail = getConfig("EMAIL_HR");
@@ -453,7 +463,11 @@ function sendHRFinanceFormEmail(row) {
 }
 
 function sendApprovalEmail(row, level) {
-  const sheet   = SS.getSheetByName(SHEET_DATA);
+  if (MailApp.getRemainingDailyQuota() < 3) {
+    throw new Error("Kuota email harian hampir habis.");
+  }
+
+  const sheet   = getSS().getSheetByName(SHEET_DATA);
   const rd      = getRowData(row, sheet);
 
   const empName         = rd.get(getConfig("HEADER_EMP_NAME"));
@@ -471,7 +485,10 @@ function sendApprovalEmail(row, level) {
   const setLimit        = formatRibuan(rd.get(getConfig("HEADER_LIMIT")));
   const totalOver       = formatRibuan(rd.get(getConfig("HEADER_TOTAL_OVER")));
 
-  const parseCleanNumber = (val) => parseFloat(val.toString().replace(/[^0-9.-]+/g, "")) || 0;
+  const parseCleanNumber = (val) => {
+    if (val == null || val === "") return 0;
+    return parseFloat(val.toString().replace(/[^0-9.-]+/g, "")) || 0;
+  };
   const currentUsageNum  = parseCleanNumber(rd.get(getConfig("HEADER_TOTAL_OVER") || "Current Usage"));
   const limitNum         = parseCleanNumber(rd.get(getConfig("HEADER_LIMIT") || "Limit"));
   const isOverlimitReq   = currentUsageNum > limitNum;
@@ -582,7 +599,7 @@ function sendApprovalEmail(row, level) {
         <table border="0" cellpadding="0" cellspacing="0" style="margin-top:25px; margin-bottom:20px;"><tr>
           <td style="padding-right: 10px;"><a href="${secureApproveUrl}" style="background:#28a745; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">APPROVED</a></td>
           <td style="padding-right: 10px;"><a href="${secureRejectUrl}" style="background:#dc3545; padding:12px 25px; color:#fff; text-decoration:none; border-radius:5px; font-weight:bold;">REJECT</a></td>
-          ${level === "HR" ? `<td style="padding-right: 10px;"><a href="\${secureHoldUrl}" style="background:#ffc107; padding:12px 25px; color:#212529; text-decoration:none; border-radius:5px; font-weight:bold;">HOLD</a></td>` : ""}
+          ${level === "HR" ? `<td style="padding-right: 10px;"><a href="${secureHoldUrl}" style="background:#ffc107; padding:12px 25px; color:#212529; text-decoration:none; border-radius:5px; font-weight:bold;">HOLD</a></td>` : ""}
         </tr></table>
       </div>
     `;
@@ -590,14 +607,26 @@ function sendApprovalEmail(row, level) {
 
   if (!toEmail) return;
 
-  let mailOptions = { cc: ccEmail, htmlBody: htmlBody, attachments: emailAttachments, name: aliasConfig.senderName };
+  let mailOptions = { 
+    htmlBody: htmlBody, 
+    name: aliasConfig.senderName 
+  };
+  
+  if (ccEmail && ccEmail.toString().trim() !== "") {
+    mailOptions.cc = ccEmail.toString().trim();
+  }
+  
+  if (emailAttachments.length > 0) {
+    mailOptions.attachments = emailAttachments;
+  }
+
   if (aliasConfig.alias !== "") mailOptions.from = aliasConfig.alias;
 
-  MailApp.sendEmail(toEmail, subject, "", mailOptions);
+  MailApp.sendEmail(toEmail.toString().trim(), subject, "", mailOptions);
 }
 
 function sendRejectEmail(row, level) {
-  const sheet = SS.getSheetByName(SHEET_DATA);
+  const sheet = getSS().getSheetByName(SHEET_DATA);
   const rd    = getRowData(row, sheet);
   
   const empStatusHeader = getConfig("HEADER_EMPLOYMENT_STATUS") || "Employment Status";
@@ -657,7 +686,7 @@ function sendRejectEmail(row, level) {
 }
 
 function _getEmployeeHistoryTableHtml(empName, currentReqRow, currentRd) {
-  const sheet = SS.getSheetByName(SHEET_DATA);
+  const sheet = getSS().getSheetByName(SHEET_DATA);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toLowerCase());
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return "<p style='color:#777;'>Tidak ada riwayat penggunaan.</p>";
@@ -724,7 +753,7 @@ function doGet(e) {
 
     if (!row || !action || !level) return HtmlService.createHtmlOutput("<h3>Error: Parameter URL tidak lengkap.</h3>");
 
-    const sheet = SS.getSheetByName(SHEET_DATA);
+    const sheet = getSS().getSheetByName(SHEET_DATA);
     const rd    = getRowData(parseInt(row), sheet);
 
     if (!rd.get(getConfig("HEADER_EMP_NAME") || "Employee Name")) return HtmlService.createHtmlOutput("<h3 style='color:#dc3545; text-align:center;'>⚠️ Data Tidak Ditemukan! (Dihapus dari Sheet)</h3>");
@@ -791,7 +820,7 @@ function showReasonForm(row, level, action, isSuperAdmin) {
 }
 
 function showFinanceFormUI(row) {
-  const sheet = SS.getSheetByName(SHEET_DATA);
+  const sheet = getSS().getSheetByName(SHEET_DATA);
   const rd    = getRowData(parseInt(row), sheet);
 
   const fmtDate = (v) => (v instanceof Date) ? Utilities.formatDate(v, "GMT+7", "dd MMM yyyy HH:mm:ss") : (v || "-");
@@ -843,7 +872,7 @@ function executeApprovalFromWeb(data) {
 
   try {
     const row       = parseInt(data.row);
-    const sheet     = SS.getSheetByName(SHEET_DATA);
+    const sheet     = getSS().getSheetByName(SHEET_DATA);
     const rd        = getRowData(row, sheet);
     
     if (!rd.get("Employee Name")) return "<h3 style='color:#dc3545;'>❌ Gagal: Data sudah dihapus dari sistem.</h3>";
@@ -861,8 +890,8 @@ function executeApprovalFromWeb(data) {
       let fileUrl = "";
       if (data.fileBase64 && data.fileMimeType && data.fileName) {
         try {
-          // GANTI DENGAN FOLDER ID DRIVE SUPER ADMIN ANDA
-          const folderId = "YOUR_SUPERADMIN_FOLDER_ID_HERE"; 
+          // GANTI DENGAN FOLDER ID DRIVE SUPER ADMIN ANDA JIKA DIPERLUKAN
+          const folderId = FOLDER_SCREENSHOT_ID; 
           const fileBlob = Utilities.newBlob(Utilities.base64Decode(data.fileBase64), data.fileMimeType, `Bukti_SuperAdmin_Row_${row}_${data.fileName}`);
           const uploadedFile = DriveApp.getFolderById(folderId).createFile(fileBlob);
           fileUrl = uploadedFile.getUrl();
@@ -928,7 +957,7 @@ function executeApprovalFromWeb(data) {
 function executeFinanceFormSubmission(data) {
   try {
     const row     = parseInt(data.row);
-    const sheet   = SS.getSheetByName(SHEET_DATA);
+    const sheet   = getSS().getSheetByName(SHEET_DATA);
     const rd      = getRowData(row, sheet);
 
     if (!rd.get("Employee Name")) return `<h3 style='color:#dc3545;'>❌ Gagal Memproses Form: Data hilang.</h3>`;
@@ -1080,4 +1109,31 @@ function resendRejectEmailViaPrompt() {
       ui.alert('❌ Gagal', `Terjadi kesalahan saat mengirim email: ${error.message}`, ui.ButtonSet.OK);
     }
   }
+}
+
+function debugHRFlow() {
+  const row = 2; // ganti dengan nomor baris yang bermasalah
+  const sheet = getSS().getSheetByName(SHEET_DATA);
+  const rd = getRowData(row, sheet);
+
+  const keys = ["EMAIL_HR","CC_HR","HEADER_STATUS","HEADER_HR_STATUS","HEADER_EMP_NAME",
+                "HEADER_TOTAL_OVER","HEADER_LIMIT","HEADER_NOMINAL","HEADER_COMPANY"];
+  keys.forEach(k => {
+    const v = getConfig(k);
+    const inSheet = v ? (rd.colIdx(v) !== -1) : "-";
+    console.log(`${k} = ${v} | header ada di Working Sheet: ${inSheet}`);
+  });
+
+  console.log("Sisa kuota email: " + MailApp.getRemainingDailyQuota());
+
+  try {
+    sendApprovalEmail(row, "HR");
+    console.log("sendApprovalEmail OK");
+  } catch (e) {
+    console.error("GAGAL: " + e.stack);
+  }
+}
+
+function cekKuota() {
+  console.log("Sisa kuota email: " + MailApp.getRemainingDailyQuota());
 }
